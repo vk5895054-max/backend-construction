@@ -1,0 +1,26 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200 || res.getStatus() === 201) {
+    const data = res.getBody();
+    if (data.success && data.data.accessToken) {
+      bru.setEnvVar("token", data.data.accessToken);
+    }
+  }
+}

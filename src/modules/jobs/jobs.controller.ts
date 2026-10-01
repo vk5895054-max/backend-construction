@@ -1,0 +1,132 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import { JobsService } from './jobs.service.js';
+import { CreateJobDto } from './dto/create-jobs.dto.js';
+import { UpdateJobDto, ModerateJobDto } from './dto/update-jobs.dto.js';
+import { CreateApplicationDto } from '../applications/dto/create-applications.dto.js';
+import { ApplicationsService } from '../applications/applications.service.js';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+
+@Controller('jobs')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+export class JobsController {
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly applicationsService: ApplicationsService,
+  ) {}
+
+  /**
+   * POST /jobs/:id/applications — Job Seeker applies to a job.
+   */
+  @Post(':id/applications')
+  @Roles('job_seeker')
+  async applyToJob(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: CreateApplicationDto,
+  ) {
+    const application = await this.applicationsService.apply(
+      id,
+      req.user.id,
+      dto,
+    );
+    return { message: 'Application submitted successfully', data: application };
+  }
+
+  @Post()
+  @Roles('company')
+  async create(@Req() req: any, @Body() dto: CreateJobDto) {
+    const job = await this.jobsService.create(req.user.id, dto);
+    return { message: 'Job created successfully', data: job };
+  }
+
+  /**
+   * GET /jobs — List jobs.
+   * For job_seekers: returns Flutter-compatible shape { items, total }.
+   * For other roles: returns standard paginated shape.
+   */
+  @Get()
+  @Roles('admin', 'company', 'job_seeker')
+  async list(
+    @Req() req: any,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('search') search?: string,
+    @Query('location') location?: string,
+    @Query('minDailyPay') minDailyPay?: string,
+    @Query('skill') skill?: string,
+    @Query('projectType') projectType?: string,
+    @Query('experienceLevel') experienceLevel?: string,
+  ) {
+    return this.jobsService.list(
+      Number(page),
+      Number(limit),
+      req.user.role,
+      req.user.id,
+      { search, location, minDailyPay, skill, projectType, experienceLevel },
+    );
+  }
+
+  @Get('saved/list')
+  @Roles('job_seeker')
+  async savedJobs(@Req() req: any) {
+    return this.jobsService.getSavedJobs(req.user.id);
+  }
+
+  @Get(':id')
+  @Roles('admin', 'company', 'job_seeker')
+  async getById(@Req() req: any, @Param('id') id: string) {
+    const job = await this.jobsService.getById(id, req.user.role, req.user.id);
+    return { data: job };
+  }
+
+  @Patch(':id')
+  @Roles('company')
+  async update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateJobDto,
+  ) {
+    const job = await this.jobsService.update(id, req.user.id, dto);
+    return { message: 'Job updated successfully', data: job };
+  }
+
+  @Post(':id/close')
+  @Roles('company')
+  async close(@Req() req: any, @Param('id') id: string) {
+    const job = await this.jobsService.close(id, req.user.id);
+    return { message: 'Job closed successfully', data: job };
+  }
+
+  @Post(':id/save')
+  @Roles('job_seeker')
+  async toggleSave(@Req() req: any, @Param('id') id: string) {
+    const data = await this.jobsService.toggleSave(req.user.id, id);
+    return { data };
+  }
+
+  @Post(':id/report')
+  @Roles('job_seeker')
+  async reportJob(@Req() req: any, @Param('id') id: string, @Body() body: { reason: string }) {
+    const data = await this.jobsService.reportJob(req.user.id, id, body.reason);
+    return { message: 'Job reported', data };
+  }
+
+  @Patch(':id/moderate')
+  @Roles('admin')
+  async moderate(@Param('id') id: string, @Body() dto: ModerateJobDto) {
+    const job = await this.jobsService.moderate(id, dto);
+    return { message: 'Job moderated successfully', data: job };
+  }
+}

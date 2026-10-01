@@ -1,0 +1,26 @@
+meta {
+  name: Update Application Status
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/applications/:id/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:path {
+  id: {{applicationId}}
+}
+
+body:json {
+  {
+    "status": "shortlisted",
+    "remark": "Your profile looks great! We'd like to invite you for an interview."
+  }
+}
